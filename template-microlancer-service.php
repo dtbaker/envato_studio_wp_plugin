@@ -1,16 +1,16 @@
 <?php
 /**
- * The template for displaying all wiki articles.
+ * The template for displaying all microlancer services
  *
- * @package dtbaker wiki
- * @since dtbaker wiki 1.0
+ * @package dtbaker microlancer
+ * @since dtbaker microlancer 1.0
  */
 
 get_header(); ?>
 
     <div class="row-fluid">
 
-        <div class="span4">
+        <div class="span3">
 
             <h4>Services</h4>
         <?php $categories = $this->get_microlancer_categories();
@@ -24,23 +24,38 @@ get_header(); ?>
                 }
                 echo '</ul>'; ?>
             </div>
-        <div class="span8">
+        <div class="span9">
 
                     <!-- <h2><a href="<?php echo add_query_arg('microlancerservice',false);?>">Custom Modifications</a> &raquo;  </h2> -->
-                    <ul>
-                    <?php
-                    //print_r($microlancer_service);
-                    foreach($microlancer_service['services'] as $service){
-                        ?>
-                        <li>
-                            <a href="<?php echo $service['url'];?>"><?php echo htmlspecialchars($service['title']);?></a>
-                            <a href="<?php echo $service['url'];?>"><img src="<?php echo $service['thumb'];?>"></a>
-                            <?php echo $service['price'];?>
-                        </li>
-                        <?php
+            <h3><?php echo $categories[$microlancer_service['current']];?> Services &raquo;</h3>
+
+
+                <?php
+                $per_row = 3;
+                while(count($microlancer_service['services'])){
+                    echo '<div class="row-fluid"><ul class="thumbnails">';
+                    for($x=0;$x<$per_row;$x++){
+                        $service = array_shift($microlancer_service['services']);
+                        if($service){
+                            ?>
+                            <li class="span<?php echo 12/$per_row;?>">
+                                <div class="thumbnail">
+                                  <img src="<?php echo $service['thumb'];?>">
+                                  <div class="caption">
+                                    <h4><?php echo htmlspecialchars($service['title']);?></h4>
+                                    <p>Changes only <?php echo $service['price'];?>.</p>
+                                    <p><a href="<?php echo $service['url'];?>" target="_blank" class="btn btn-primary">More Information</a></p>
+                                  </div>
+                                </div>
+                              </li>
+                            <?php
+                        }
                     }
-                    ?>
-                    </ul>
+                    echo '</ul></div>';
+                }
+                ?>
+                </div>
+
                 </div>
 		</div>
 
