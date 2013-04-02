@@ -60,32 +60,36 @@ class microlancer_wordpress {
         $microlancer_service = isset( $wp_query->query_vars['microlancerservice'] ) ? $wp_query->query_vars['microlancerservice'] : false;
         if($microlancer_service){
             // pull our faq article in using wp_remote_get
-            $url = $this->url . '/explore/'.$microlancer_service;
-            $data = (wp_remote_get($url));
-            $page_data = is_array($data) && isset($data['body']) ? $data['body'] : '';
-            //regex out the important bits
-            if(preg_match_all('#<article class="l-list service">(.*)</article>#imsU',$page_data,$matches)){
-                $services = array();
-                //print_r($matches);
-                foreach($matches[1] as $key=>$service){
-                    if(preg_match('#<h1 class="service-title">\s*<a href="([^"]+)">([^<]+)</a>#',$service,$service_matches)){
-                        preg_match('#>(\$\d+)<#',$service,$price);
-                        preg_match('#src="//([^"]+)"#',$service,$thumb);
-                        $this_service=array(
-                            'html' => $service,
-                            'price'=>$price[1],
-                            'title' => $service_matches[2],
-                            'url' => $this->url . $service_matches[1],
-                            'thumb' => 'http://'.$thumb[1],
-                        );
-                        $services[]=$this_service;
+            $services = $this->_cache_get($microlancer_service);
+            if(!$services){
+                $url = $this->url . '/explore/'.$microlancer_service;
+                $data = (wp_remote_get($url));
+                $page_data = is_array($data) && isset($data['body']) ? $data['body'] : '';
+                //regex out the important bits
+                if(preg_match_all('#<article class="l-list service">(.*)</article>#imsU',$page_data,$matches)){
+                    $services = array();
+                    //print_r($matches);
+                    foreach($matches[1] as $key=>$service){
+                        if(preg_match('#<h1 class="service-title">\s*<a href="([^"]+)">([^<]+)</a>#',$service,$service_matches)){
+                            preg_match('#>(\$\d+)<#',$service,$price);
+                            preg_match('#src="//([^"]+)"#',$service,$thumb);
+                            $this_service=array(
+                                'html' => $service,
+                                'price'=>$price[1],
+                                'title' => $service_matches[2],
+                                'url' => $this->url . $service_matches[1],
+                                'thumb' => 'http://'.$thumb[1],
+                            );
+                            $services[]=$this_service;
+                        }
                     }
                 }
-                return array(
-                    'current'=>$microlancer_service,
-                    'services'=>$services
-                );
+                $this->_cache_add($microlancer_service,$services);
             }
+            return array(
+                'current'=>$microlancer_service,
+                'services'=>$services
+            );
         }
         return false;
     }
@@ -94,7 +98,7 @@ class microlancer_wordpress {
     }*/
     public function get_microlancer_categories(){
         // get a list of our faq articles by doing wp_remote_get
-        $categories = wp_cache_get('microlancer_services');
+        $categories = $this->_cache_get('microlancer_services');
         if(!$categories){
             $url = $this->url.'/explore/';
             $data = wp_remote_get($url);
@@ -119,6 +123,7 @@ class microlancer_wordpress {
                     $categories[$slug] = trim(html_entity_decode($matches[2][$key]));
                 }
                 //print_r($categories);
+                $this->_cache_add('microlancer_services',$categories);
             }
         }
         return $categories;
@@ -160,6 +165,19 @@ class microlancer_wordpress {
             <link rel="canonical" href="<?php echo htmlspecialchars($faq_item['url']);?>" />
             <?php
         }*/
+    }
+
+    // had issues with wp supercache, doing my own file based caching for this item.
+    private function _cache_add($key,$data){
+        $cache_file = dirname(__FILE__) . "/cache/".basename($key);
+        file_put_contents($cache_file,serialize($data));
+    }
+    private function _cache_get($key,$time_limit=3600){
+    $cache_file = dirname(__FILE__) . "/cache/".basename($key);
+        if(is_file($cache_file) && filemtime($cache_file) > time()-$time_limit){
+            return unserialize(file_get_contents($cache_file));
+        }
+        return false;
     }
 }
 
