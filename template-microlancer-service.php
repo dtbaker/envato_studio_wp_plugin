@@ -12,12 +12,15 @@ get_header(); ?>
 
         <div class="span3">
 
-            <h4>Services</h4>
+            <h4>All Services:</h4>
         <?php $categories = $this->get_microlancer_categories();
             echo '<ul class="microlancer_services">';
                 foreach($categories as $slug => $category){
                     echo '<li class="microlancer_service">';
-                    echo '<a href="'.add_query_arg('microlancerservice',$slug).'" class="microlancer_link'.(isset($microlancer_service['current']) && $microlancer_service['current'] == $slug ? ' current' : '').'">';
+                    echo '<a href="';
+                    //echo add_query_arg('microlancerservice',$slug);
+                    echo get_permalink().'microlancerservice/'.$slug.'/';
+                    echo '" class="microlancer_link'.(isset($microlancer_service['current']) && $microlancer_service['current'] == $slug ? ' current' : '').'">';
                     echo htmlspecialchars($category);
                     echo '</a>';
                     echo '</li>';

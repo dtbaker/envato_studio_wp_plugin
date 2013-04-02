@@ -27,6 +27,9 @@ class microlancer_wordpress {
 
     public function microlancer_wp_endpoints(){
         add_rewrite_endpoint( 'microlancerservice', EP_ALL);
+        // above doesn't work well with our custom category, so we add a custom rewrite rule:
+        add_rewrite_rule('^/(.*)/microlancerservice/(.*)/?','index.php?pagename=$matches[1]&microlancerservice=$matches[2]','top');
+        //pagename=envato%2Fcustom-themeforest-or-codecanyon-modifications&microlancerservice=photography
     }
     public function microlancer_page_template(){
         global $wp,$wp_query,$post;
@@ -57,37 +60,12 @@ class microlancer_wordpress {
     private function _current_microlancer_service(){
         global $wp_query;
         // look at the url, check if we're tring to load a faq article or not.
-        $microlancer_service = isset( $wp_query->query_vars['microlancerservice'] ) ? $wp_query->query_vars['microlancerservice'] : false;
-        if($microlancer_service){
+        $requested_microlancer_service = isset( $wp_query->query_vars['microlancerservice'] ) ? $wp_query->query_vars['microlancerservice'] : false;
+        if($requested_microlancer_service){
             // pull our faq article in using wp_remote_get
-            $services = $this->_cache_get($microlancer_service);
-            if(!$services){
-                $url = $this->url . '/explore/'.$microlancer_service;
-                $data = (wp_remote_get($url));
-                $page_data = is_array($data) && isset($data['body']) ? $data['body'] : '';
-                //regex out the important bits
-                if(preg_match_all('#<article class="l-list service">(.*)</article>#imsU',$page_data,$matches)){
-                    $services = array();
-                    //print_r($matches);
-                    foreach($matches[1] as $key=>$service){
-                        if(preg_match('#<h1 class="service-title">\s*<a href="([^"]+)">([^<]+)</a>#',$service,$service_matches)){
-                            preg_match('#>(\$\d+)<#',$service,$price);
-                            preg_match('#src="//([^"]+)"#',$service,$thumb);
-                            $this_service=array(
-                                'html' => $service,
-                                'price'=>$price[1],
-                                'title' => $service_matches[2],
-                                'url' => $this->url . $service_matches[1],
-                                'thumb' => 'http://'.$thumb[1],
-                            );
-                            $services[]=$this_service;
-                        }
-                    }
-                }
-                $this->_cache_add($microlancer_service,$services);
-            }
+            $services = $this->get_microlancer_services($requested_microlancer_service);
             return array(
-                'current'=>$microlancer_service,
+                'current'=>$requested_microlancer_service,
                 'services'=>$services
             );
         }
@@ -96,6 +74,35 @@ class microlancer_wordpress {
     /*private  function _sort_categories($a,$b){
         return strnatcasecmp($a['name'], $b['name']);
     }*/
+    public function get_microlancer_services($category,$only_cached=false){
+        $services = $this->_cache_get($category,($only_cached?9999999999:3600));
+        if(!$services){
+            $url = $this->url . '/explore/'.$category;
+            $data = wp_remote_get($url);
+            $page_data = is_array($data) && isset($data['body']) ? $data['body'] : '';
+            //regex out the important bits
+            if(preg_match_all('#<article class="l-list service">(.*)</article>#imsU',$page_data,$matches)){
+                $services = array();
+                //print_r($matches);
+                foreach($matches[1] as $key=>$service){
+                    if(preg_match('#<h1 class="service-title">\s*<a href="([^"]+)">([^<]+)</a>#',$service,$service_matches)){
+                        preg_match('#>(\$\d+)<#',$service,$price);
+                        preg_match('#src="//([^"]+)"#',$service,$thumb);
+                        $this_service=array(
+                            'html' => $service,
+                            'price'=>$price[1],
+                            'title' => $service_matches[2],
+                            'url' => $this->url . $service_matches[1],
+                            'thumb' => 'http://'.$thumb[1],
+                        );
+                        $services[]=$this_service;
+                    }
+                }
+            }
+            $this->_cache_add($category,$services);
+        }
+        return $services;
+    }
     public function get_microlancer_categories(){
         // get a list of our faq articles by doing wp_remote_get
         $categories = $this->_cache_get('microlancer_services');
@@ -129,22 +136,18 @@ class microlancer_wordpress {
         return $categories;
     }
     function microlancer_wp_shortcode_print($args) {
-
         $categories = $this->get_microlancer_categories();
         if($categories){
             ob_start();
-            // title? meh. make that part of the page embedding the shortcode
-            echo isset($args['title']) ? '<h1>'.(isset($args['title'])? $args['title'] : 'Available Services').'</h1>' : '';
-
-            echo '<ul class="microlancer_services">';
-            foreach($categories as $slug => $category){
-                echo '<li class="microlancer_service">';
-                echo '<a href="'.add_query_arg('microlancerservice',$slug).'" class="microlancer_link">';
-                echo htmlspecialchars($category);
-                echo '</a>';
-                echo '</li>';
+            $templatefilename = 'template-microlancer-services.php';
+            if( file_exists( get_template_directory() .'/'.$templatefilename)){
+                $return_template = get_template_directory() .'/'.$templatefilename;
+            }else if (file_exists(dirname( __FILE__ ) . '/' . $templatefilename)) {
+                $return_template = dirname( __FILE__ ) . '/' . $templatefilename;
             }
-            echo '</ul>';
+            if (isset($return_template)) {
+                include($return_template);
+            }
             return ob_get_clean();
         }
     }
